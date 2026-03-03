@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vocabulary Trainer</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+/* APP CONTAINER */
+.app-container {
+    max-width: 375px;
+    margin: auto;
+    min-height: 100dvh;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* CARD */
+.card {
+    background: white;
+    width: 100%;
+    border-radius: 28px;
+    padding: 22px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+}
+
+/* TITLE */
+h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 18px;
+    color: #333;
+}
+
+/* INPUT */
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 14px 0;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+}
+
+textarea { resize: vertical; }
+
+/* BUTTON */
+button {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #eef0ff;
+    color: #667eea;
+}
+
+/* SAVED LIST */
+.saved-item {
+    background: #f5f5f5;
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin-top: 6px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer; /* 👈 click cả ô */
+}
+
+.saved-item:hover {
+    background: #e9ecff;
+}
+
+.delete-btn {
+    color: red;
+    cursor: pointer;
+}
+
+/* QUIZ */
+#quiz { display: none; }
+
+/* FIXED QUIZ LAYOUT */
+.quiz-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 420px; /* 👈 cố định chiều cao */
+}
+
+/* WORD BOX */
+.word-box {
+    flex: 1;
+    background: #f7f7f7;
+    border-radius: 18px;
+    padding: 18px;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.en-box { color: #667eea; }
+
+/* BUTTON ROW */
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
+.button-row button {
+    flex: 1;
+    margin-bottom: 0;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app-container">
+
+<!-- SETUP -->
+<div id="setup" class="card">
+    <h2>Vocabulary Trainer</h2>
+
+    <input type="text" id="setName" placeholder="Tên bộ từ">
+
+    <label>Từ tiếng Anh (mỗi dòng 1 từ)</label>
+    <textarea id="englishInput"></textarea>
+
+    <label>Nghĩa tiếng Việt (mỗi dòng 1 nghĩa)</label>
+    <textarea id="vietnameseInput"></textarea>
+
+    <button onclick="saveSet()">💾 Lưu bộ</button>
+    <button onclick="startQuiz()">▶ Bắt đầu học</button>
+
+    <h3 style="color:#333;margin-top:15px;">Bộ đã lưu</h3>
+    <div id="savedList"></div>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" class="card">
+    <h2>Học từ vựng</h2>
+
+    <div class="quiz-content">
+        <div>
+            <div class="word-box" id="vnBox"></div>
+            <div class="word-box en-box" id="enBox"></div>
+        </div>
+
+        <div class="button-row">
+            <button onclick="goHome()">Quay lại</button>
+            <button onclick="speakWord()">Phát âm</button>
+            <button onclick="nextStep()">Next</button>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+
+let wordList = [];
+let currentIndex = 0;
+let showEnglish = false;
+
+/* SAVE */
+function saveSet() {
+    const name = document.getElementById("setName").value.trim();
+    if (!name) return alert("Nhập tên bộ!");
+
+    const en = document.getElementById("englishInput").value;
+    const vi = document.getElementById("vietnameseInput").value;
+
+    const sets = JSON.parse(localStorage.getItem("vocabSets") || "{}");
+    sets[name] = { en, vi };
+    localStorage.setItem("vocabSets", JSON.stringify(sets));
+
+    loadSavedSets();
+    alert("Đã lưu!");
+}
+
+function loadSavedSets() {
+    const sets = JSON.parse(localStorage.getItem("vocabSets") || "{}");
+    const container = document.getElementById("savedList");
+    container.innerHTML = "";
+
+    for (let name in sets) {
+        let div = document.createElement("div");
+        div.className = "saved-item";
+        div.onclick = () => loadSet(name); /* 👈 click cả ô */
+
+        div.innerHTML = `
+            <span>${name}</span>
+            <span class="delete-btn" onclick="deleteSet('${name}', event)">✕</span>
+        `;
+        container.appendChild(div);
+    }
+}
+
+function loadSet(name) {
+    const sets = JSON.parse(localStorage.getItem("vocabSets") || "{}");
+    document.getElementById("englishInput").value = sets[name].en;
+    document.getElementById("vietnameseInput").value = sets[name].vi;
+    document.getElementById("setName").value = name;
+}
+
+function deleteSet(name, e) {
+    e.stopPropagation();
+    const sets = JSON.parse(localStorage.getItem("vocabSets") || "{}");
+    delete sets[name];
+    localStorage.setItem("vocabSets", JSON.stringify(sets));
+    loadSavedSets();
+}
+
+/* QUIZ */
+function startQuiz() {
+    const enLines = document.getElementById("englishInput").value.trim().split("\n");
+    const viLines = document.getElementById("vietnameseInput").value.trim().split("\n");
+
+    if (enLines.length !== viLines.length)
+        return alert("Số dòng không khớp!");
+
+    wordList = enLines.map((en,i)=>({
+        en: en.trim(),
+        vi: viLines[i].trim()
+    }));
+
+    currentIndex = 0;
+    showEnglish = false;
+
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("quiz").style.display = "block";
+
+    showWord();
+}
+
+function showWord() {
+    if (currentIndex >= wordList.length) {
+        document.getElementById("vnBox").innerText = "🎉 Hoàn thành!";
+        document.getElementById("enBox").innerText = "";
+        return;
+    }
+
+    let word = wordList[currentIndex];
+    document.getElementById("vnBox").innerText = word.vi;
+    document.getElementById("enBox").innerText =
+        showEnglish ? word.en : "";
+}
+
+function nextStep() {
+    if (!showEnglish) {
+        showEnglish = true;
+    } else {
+        showEnglish = false;
+        currentIndex++;
+    }
+    showWord();
+}
+
+function speakWord() {
+    if (!showEnglish) return;
+    let utter = new SpeechSynthesisUtterance(wordList[currentIndex].en);
+    utter.lang = "en-US";
+    speechSynthesis.speak(utter);
+}
+
+function goHome() {
+    document.getElementById("quiz").style.display = "none";
+    document.getElementById("setup").style.display = "block";
+}
+
+document.addEventListener("DOMContentLoaded", loadSavedSets);
+
+</script>
+
+</body>
+</html>
